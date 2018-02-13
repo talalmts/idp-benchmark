@@ -1,0 +1,147 @@
+version: '3'
+
+volumes:
+    provenancesensordata:
+        external: true
+
+services:
+    cassandra:
+        image: cassandra:latest
+        ports:
+            - "9042:9042"
+
+    idprovider:
+        image: cloudproto/idprovider:latest
+        environment:
+            - START_ID=31400010000000000
+
+    sensorGroupA:
+            image: cloudproto/sensor:latest
+            volumes:
+                - provenancesensordata:/mnt
+            environment:
+                - SENSOR_PARAMETERS=-sourceFolder /mnt/oneday -sensorIdProvider idprovider:8080 -frequency 1000 -targetAddress gatewayA:50051 -targetType grpc-pipeline
+                - STARTUP_DELAY=30
+
+    sensorGroupB:
+            image: cloudproto/sensor:latest
+            volumes:
+                - provenancesensordata:/mnt
+            environment:
+                - SENSOR_PARAMETERS=-sourceFolder /mnt/oneday -sensorIdProvider idprovider:8080 -frequency 1000 -targetAddress gatewayB:50051 -targetType grpc-pipeline
+                - STARTUP_DELAY=30
+    sensorGroupC:
+            image: cloudproto/sensor:latest
+            volumes:
+                - provenancesensordata:/mnt
+            environment:
+                - SENSOR_PARAMETERS=-sourceFolder /mnt/oneday -sensorIdProvider idprovider:8080 -frequency 1000 -targetAddress gatewayC:50051 -targetType grpc-pipeline
+                - STARTUP_DELAY=30
+
+    sensorGroupD:
+            image: cloudproto/sensor:latest
+            volumes:
+                - provenancesensordata:/mnt
+            environment:
+                - SENSOR_PARAMETERS=-sourceFolder /mnt/oneday -sensorIdProvider idprovider:8080 -frequency 1000 -targetAddress gatewayD:50051 -targetType grpc-pipeline
+                - STARTUP_DELAY=30
+
+    gatewayA:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000001
+            - NODE_NAME=gatewayA
+            - ARGUMENTS=--port 50051 --host_next gatewayE --port_next 50051
+            - STARTUP_DELAY=20
+            - BUFFER_CAPACITY=10
+            - SUCCESSOR=000005
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    gatewayB:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000002
+            - NODE_NAME=gatewayB
+            - ARGUMENTS=--port 50051 --host_next gatewayE --port_next 50051
+            - STARTUP_DELAY=20
+            - SUCCESSOR=000005
+            - BUFFER_CAPACITY=10
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    gatewayC:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000003
+            - NODE_NAME=gatewayA
+            - ARGUMENTS=--port 50051 --host_next gatewayF --port_next 50051
+            - STARTUP_DELAY=20
+            - BUFFER_CAPACITY=10
+            - SUCCESSOR=000006
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    gatewayD:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000004
+            - NODE_NAME=gatewayB
+            - ARGUMENTS=--port 50051 --host_next gatewayF --port_next 50051
+            - STARTUP_DELAY=20
+            - SUCCESSOR=000006
+            - BUFFER_CAPACITY=10
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    gatewayE:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000005
+            - NODE_NAME=gatewayA
+            - ARGUMENTS=--port 50051 --host_next endpoint --port_next 50051
+            - STARTUP_DELAY=20
+            - BUFFER_CAPACITY=10
+            - SUCCESSOR=000007
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    gatewayF:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - NODE_ID=000006
+            - NODE_NAME=gatewayB
+            - ARGUMENTS=--port 50051 --host_next endpoint --port_next 50051
+            - STARTUP_DELAY=20
+            - SUCCESSOR=000007
+            - BUFFER_CAPACITY=10
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    endpoint:
+        image: cloudproto/pipeline_component:latest
+        environment:
+            - CASSANDRA_HOST=cassandra
+            - STARTUP_DELAY=20
+            - ARGUMENTS=--port 50051
+            - NODE_ID=000007
+            - NODE_NAME=endpoint
+            - BUFFER_CAPACITY=10
+            - METRICS=meterid,metricid,loc,line,class,app,ctime,stime,rtime
+
+    # backend:
+    #     image: cloudproto/provenancebackend:latest
+    #     environment:
+    #         - DB_IP=cassandra
+    #     ports:
+    #         - "5000:5000"  
+    #     depends_on:
+    #         - cassandra
+    # frontend:
+    #     image: cloudproto/provenancefrontend:latest
+    #     environment:
+    #         - "BACKEND_HOST=backend:5000"
+    #     ports:
+    #         - "8080:8080"
+    #     depends_on:
+    #         - backend
